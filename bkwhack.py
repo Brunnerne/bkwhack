@@ -2,40 +2,10 @@
 
 import argparse
 import subprocess
-from typing import Optional
+import sys
+
 from zipfile import ZipFile
-from pwn import *
-import io
-
-context.log_level = "warn"
-
-
-# Table of file types and byte sequences known to be at specific file offsets
-# Negative offsets are offsets from the end of the file
-CRIB_TABLE = {
-    "7z": {
-        0: b"7z\xbc\xaf\x27\x1c\x00",  # then likely \x04, but not guaranteed
-        18: b"\x00\x00",
-        26: b"\x00\x00",
-        -2: b"\x00\x00"
-    },
-    "exe": {
-        0: b"MZ",
-        28: b"\x00" * 12
-    },
-    "dll": {
-        0: b"MZ",
-        28: b"\x00" * 12
-    },
-    "jpg": {
-        0: b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01",
-        -2: b"\xff\xd9"
-    },
-    "png": {
-        0: b"\x89PNG\x0d\x0a\x1a\x0a\x00\x00\x00\x0dIHDR",
-        -12: b"\x00\x00\x00\x00IEND\xae\x42\x60\x82"
-    }
-}
+from fileformats import CRIB_TABLE
 
 
 def load(filename: str) -> ZipFile:
@@ -48,7 +18,7 @@ def run_cmd(cmd: str) -> str:
 
 def get_crackable(zip_file: ZipFile) -> dict:
     """
-    Find all ZipCrypto encrypted files with supported filetypes in the zip archive.
+    Find all ZipCrypto encrypted files with supported filetypes.
     Currently, only non-compressed (Store) files are supported.
     """
     crackable = {}
@@ -64,34 +34,41 @@ def get_crackable(zip_file: ZipFile) -> dict:
             continue
 
         # Compute actual offsets based on file size
-        filesize = int(info[4])
+        size = int(info[4])
         cribs = CRIB_TABLE[ext]
-        offset_cribs = {offset % filesize: crib for offset, crib in cribs.items()}
+        offset_cribs = {offset % size: crib for offset, crib in cribs.items()}
         crackable[filename] = offset_cribs
 
     return crackable
 
 
-def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> Optional[str]:
+def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> str:
     # Build command based on known bytes at specific offsets
     cmd = f"bkcrack -C {zip_file.filename} -c {filename}"
     for offset, crib in cribs.items():
         cmd += f" -x {offset} {crib.hex()}"
 
-    print(cmd)
+    print(cmd + "\n")
 
-    # TODO Make this work without pwntools
-    with process(cmd.split()) as p:
-        p.readline()
-        while True:
-            output = p.read().decode()
-            if "Keys" in output:
-                return output.split(":")[1].strip()
+    p = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+    for _ in range(4):
+        p.stdout.readline()
 
-            print(output, end="")
+    for c in iter(lambda: p.stdout.read(1).decode(), ""):
+        sys.stdout.write(c)
+        if c == ")":
+            sys.stdout.flush()
+        elif c == "\n":
+            break
+
+    p.stdout.readline()
+    p.stdout.readline()
+
+    keys = p.stdout.readline().decode().strip()
+    return keys
 
 
-def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password") -> None:
+def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password"):
     crackable = get_crackable(zip_file)
     if len(crackable) == 0:
         print("No auto-crackable files found :(")
@@ -99,7 +76,7 @@ def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password"
 
     for filename, cribs in crackable.items():
         print(f"[+] Found potentially crackable file '{filename}'")
-        print("[+] Attempting key recovery, this might take a while...")
+        print("[+] Attempting key recovery, this might take a while...\n")
         keys = recover_keys(zip_file, filename, cribs)
         if keys is None:
             continue
@@ -116,9 +93,26 @@ def parse_args():
         description="BKWHACK: bkcrack automation tool",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("filename", metavar="zipfile", type=argparse.FileType("rb"), help="Encrypted ZIP file")
-    parser.add_argument("-o", "--output", default="out.zip", help="Filename for unlocked ZIP file")
-    parser.add_argument("-p", "--password", default="hunter2", help="New password for unlocked ZIP file")
+
+    parser.add_argument(
+        "filename",
+        metavar="zipfile",
+        type=argparse.FileType("rb"),
+        help="Encrypted ZIP file"
+    )
+
+    parser.add_argument(
+        "-o", "--output",
+        default="out.zip",
+        help="Filename for unlocked ZIP file"
+    )
+
+    parser.add_argument(
+        "-p", "--password",
+        default="hunter2",
+        help="New password for unlocked ZIP file"
+    )
+
     return parser.parse_args()
 
 
