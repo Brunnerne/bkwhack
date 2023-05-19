@@ -13,6 +13,14 @@ context.log_level = "warn"
 # Table of file types and byte sequences known to be at specific file offsets
 # Negative offsets are offsets from the end of the file
 CRIB_TABLE = {
+    "exe": {
+        0: b"MZ",
+        28: b"\x00" * 12
+    },
+    "dll": {
+        0: b"MZ",
+        28: b"\x00" * 12
+    },
     "jpg": {
         0: b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01",
         -2: b"\xff\xd9"
