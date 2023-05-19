@@ -90,6 +90,11 @@ def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password"
         run_cmd(f"bkcrack -C {zip_file.filename} -k {keys} -U {output} {password}")
         print("[+] Wrote unlocked archive, extract with:")
         print(f"$ unzip -P {password} {output}")
+        return True
+
+    print("[+] Autocracking unsuccessful :(")
+
+    return False
 
 
 def parse_args():
