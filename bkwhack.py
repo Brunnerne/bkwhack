@@ -13,6 +13,10 @@ context.log_level = "warn"
 # Table of file types and byte sequences known to be at specific file offsets
 # Negative offsets are offsets from the end of the file
 CRIB_TABLE = {
+    "jpg": {
+        0: b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01",
+        -2: b"\xff\xd9"
+    },
     "png": {
         0: b"\x89PNG\x0d\x0a\x1a\x0a\x00\x00\x00\x0dIHDR",
         -12: b"\x00\x00\x00\x00IEND\xae\x42\x60\x82"
