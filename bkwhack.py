@@ -37,9 +37,13 @@ def get_crackable(zip_file: ZipFile) -> dict:
         size = int(info[4])
         cribs = CRIB_TABLE[ext]
         offset_cribs = {offset % size: crib for offset, crib in cribs.items()}
-        crackable[filename] = offset_cribs
 
-    return crackable
+        # Index by length of longest crib, then size for easy sorting
+        index = (-max(len(c) for c in offset_cribs.values()), size)
+        crackable[index] = (filename, offset_cribs)
+
+    # Sort by fastest crackable
+    return dict(sorted(crackable.items())).values()
 
 
 def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> str:
@@ -74,7 +78,7 @@ def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password"
         print("No auto-crackable files found :(")
         return
 
-    for filename, cribs in crackable.items():
+    for filename, cribs in crackable:
         print(f"[+] Found potentially crackable file '{filename}'")
         print("[+] Attempting key recovery, this might take a while...\n")
         keys = recover_keys(zip_file, filename, cribs)
