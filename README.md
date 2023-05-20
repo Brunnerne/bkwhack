@@ -2,7 +2,7 @@
 Automated helper tool for bkcrack
 
 ```
-usage: bkwhack.py [-h] [-o OUTPUT] [-p PASSWORD] zipfile
+usage: bkwhack.py [-h] [-l] [-o OUTPUT] [-p PASSWORD] [zipfile]
 
 BKWHACK: bkcrack automation tool
 
@@ -11,6 +11,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
+  -l, --list            List supported file types
   -o OUTPUT, --output OUTPUT
                         Filename for unlocked ZIP file (default: out.zip)
   -p PASSWORD, --password PASSWORD

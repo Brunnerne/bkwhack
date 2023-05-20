@@ -76,7 +76,7 @@ def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> Optional[str]
     return keys
 
 
-def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password"):
+def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password") -> bool:
     crackable = get_crackable(zip_file)
     if len(crackable) == 0:
         print("No auto-crackable files found :(")
@@ -104,34 +104,54 @@ def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password"
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="BKWHACK: bkcrack automation tool",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="BKWHACK: bkcrack automation tool"
     )
 
     parser.add_argument(
         "filename",
+        nargs="?",
         metavar="zipfile",
         type=argparse.FileType("rb"),
         help="Encrypted ZIP file"
     )
 
     parser.add_argument(
+        "-l", "--list",
+        action="store_true",
+        help="List supported file types"
+    )
+
+    parser.add_argument(
         "-o", "--output",
         default="out.zip",
-        help="Filename for unlocked ZIP file"
+        help="Filename for unlocked ZIP file (default: %(default)s)"
     )
 
     parser.add_argument(
         "-p", "--password",
         default="hunter2",
-        help="New password for unlocked ZIP file"
+        help="New password for unlocked ZIP file (default: %(default)s)"
     )
 
     return parser.parse_args()
 
 
+def print_supported_filetypes():
+    print("========================")
+    print("  SUPPORTED FILE TYPES")
+    print("========================")
+    alphabetical = sorted(CRIB_TABLE)
+    for i in range(0, len(alphabetical), 5):
+        print(", ".join(alphabetical[i:i + 5]))
+    return
+
+
 def main():
     args = parse_args()
+    if args.list:
+        print_supported_filetypes()
+        return
+
     zip_file = load(args.filename)
     crack(zip_file, args.output, args.password)
 
