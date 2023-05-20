@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import sys
 
+from typing import Optional
 from zipfile import ZipFile
 from fileformats import CRIB_TABLE
 
@@ -46,7 +47,7 @@ def get_crackable(zip_file: ZipFile) -> dict:
     return dict(sorted(crackable.items())).values()
 
 
-def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> str:
+def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> Optional[str]:
     # Build command based on known bytes at specific offsets
     cmd = f"bkcrack -C {zip_file.filename} -c {filename}"
     for offset, crib in cribs.items():
@@ -64,10 +65,13 @@ def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> str:
             sys.stdout.flush()
         elif c == "\n":
             break
+    print()
+
+    status = p.stdout.readline()
+    if b"Could not find the keys" in status:
+        return
 
     p.stdout.readline()
-    p.stdout.readline()
-
     keys = p.stdout.readline().decode().strip()
     return keys
 
@@ -83,9 +87,10 @@ def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password"
         print("[+] Attempting key recovery, this might take a while...\n")
         keys = recover_keys(zip_file, filename, cribs)
         if keys is None:
+            print(f"[+] Key recovery failed for file '{filename}'\n")
             continue
 
-        print(f"\n[+] Keys successfully recovered: {keys}")
+        print(f"[+] Keys successfully recovered: {keys}")
 
         run_cmd(f"bkcrack -C {zip_file.filename} -k {keys} -U {output} {password}")
         print("[+] Wrote unlocked archive, extract with:")
