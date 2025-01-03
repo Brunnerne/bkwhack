@@ -35,7 +35,7 @@ def get_crackable(zip_file: ZipFile) -> dict:
         if ext not in CRIB_TABLE:
             continue
 
-        # Compute absolute crib offsets based on file size
+        # Compute absolute crib offsets based on uncompressed file size
         size = int(info[4])
         cribs = CRIB_TABLE[ext]
         offset_cribs = {offset % size: crib for offset, crib in cribs.items()}
@@ -70,13 +70,12 @@ def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> str | None:
             break
     print()
 
-    p.stdout.readline()
     status = p.stdout.readline()
     if b"Could not find the keys" in status:
         return
 
-    p.stdout.readline()
-    p.stdout.readline()
+    for _ in range(3):
+        p.stdout.readline()
     keys = p.stdout.readline().decode().strip()
 
     return keys
@@ -87,11 +86,16 @@ def crack(zip_file: ZipFile, output: str) -> bool:
     log.info(f"Analyzing files in {zip_file.filename}...\n")
     crackable = get_crackable(zip_file)
     if len(crackable) == 0:
-        log.error("No auto-crackable files found :(")
+        log.error("No supported auto-crackable files found :(")
         return
 
+    log.success(f"Found {len(crackable)} potentially crackable files:")
     for filename, cribs in crackable:
-        log.info(f"Attempting key recovery for potentially crackable file '{filename}':\n")
+        print(f"  - {filename}")
+    print()
+
+    for filename, cribs in crackable:
+        log.info(f"Attempting key recovery for '{filename}':\n")
         keys = recover_keys(zip_file, filename, cribs)
         if keys is None:
             log.warning(f"Key recovery failed for file '{filename}'\n")
