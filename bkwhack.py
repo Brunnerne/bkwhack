@@ -34,7 +34,7 @@ def get_crackable(zip_file: ZipFile) -> dict:
         if ext not in CRIB_TABLE:
             continue
 
-        # Compute actual offsets based on file size
+        # Compute absolute crib offsets based on file size
         size = int(info[4])
         cribs = CRIB_TABLE[ext]
         offset_cribs = {offset % size: crib for offset, crib in cribs.items()}
@@ -132,8 +132,13 @@ def parse_args():
         default="hunter2",
         help="New password for unlocked ZIP file (default: %(default)s)"
     )
+    
+    args = parser.parse_args()
 
-    return parser.parse_args()
+    if not args.list and args.filename is None:
+        parser.error("A filename or --list is required")
+
+    return args
 
 
 def print_supported_filetypes():
@@ -142,7 +147,7 @@ def print_supported_filetypes():
     print("========================")
     alphabetical = sorted(CRIB_TABLE)
     for i in range(0, len(alphabetical), 5):
-        print(", ".join(alphabetical[i:i + 5]))
+        print(*alphabetical[i:i + 5], sep=", ", end=",\n")
     return
 
 
