@@ -4,7 +4,6 @@ import argparse
 import subprocess
 import sys
 
-from typing import Optional
 from zipfile import ZipFile
 from fileformats import CRIB_TABLE
 
@@ -47,18 +46,19 @@ def get_crackable(zip_file: ZipFile) -> dict:
     return dict(sorted(crackable.items())).values()
 
 
-def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> Optional[str]:
+def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> str | None:
     # Build command based on known bytes at specific offsets
     cmd = f"bkcrack -C {zip_file.filename} -c {filename}"
     for offset, crib in cribs.items():
         cmd += f" -x {offset} {crib.hex()}"
 
-    print(cmd + "\n")
+    print(f"{cmd}\n")
 
     p = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
     for _ in range(4):
         p.stdout.readline()
 
+    # Display bkwhack's internal progress
     for c in iter(lambda: p.stdout.read(1).decode(), ""):
         sys.stdout.write(c)
         if c == ")":
@@ -67,42 +67,48 @@ def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> Optional[str]
             break
     print()
 
+    p.stdout.readline()
     status = p.stdout.readline()
     if b"Could not find the keys" in status:
         return
 
     p.stdout.readline()
+    p.stdout.readline()
     keys = p.stdout.readline().decode().strip()
+
     return keys
 
 
-def crack(zip_file: ZipFile, output: str = "out.zip", password: str = "password") -> bool:
+def crack(zip_file: ZipFile, output: str) -> bool:
     crackable = get_crackable(zip_file)
     if len(crackable) == 0:
-        print("No auto-crackable files found :(")
+        print("[!] No auto-crackable files found :(")
         return
 
     for filename, cribs in crackable:
         print(f"[+] Found potentially crackable file '{filename}'")
-        print("[+] Attempting key recovery, this might take a while...\n")
+        print("[*] Attempting key recovery, this might take a while...\n")
         keys = recover_keys(zip_file, filename, cribs)
         if keys is None:
-            print(f"[+] Key recovery failed for file '{filename}'\n")
+            print(f"[-] Key recovery failed for file '{filename}'\n")
             continue
 
         print(f"[+] Keys successfully recovered: {keys}")
 
-        run_cmd(f"bkcrack -C {zip_file.filename} -k {keys} -U {output} {password}")
-        print("[+] Wrote unlocked archive, extract with:")
-        print(f"$ unzip -P {password} {output}")
+        print(f"[*] Generating unencrypted output archive '{output}'...")
+        cmd = f"bkcrack -C {zip_file.filename} -k {keys} -D {output}"
+        print(f"\n{cmd}\n")
+        run_cmd(cmd)
+        print(f"[+] Unencrypted archive generated and can now be extracted")
+
         return True
 
-    print("[+] Autocracking unsuccessful :(")
+    print("[!] Auto-cracking unsuccessful :(")
 
     return False
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="BKWHACK: bkcrack automation tool"
     )
@@ -122,15 +128,9 @@ def parse_args():
     )
 
     parser.add_argument(
-        "-o", "--output",
-        default="out.zip",
+        "-o", "--out",
+        default="decrypted.zip",
         help="Filename for unlocked ZIP file (default: %(default)s)"
-    )
-
-    parser.add_argument(
-        "-p", "--password",
-        default="hunter2",
-        help="New password for unlocked ZIP file (default: %(default)s)"
     )
     
     args = parser.parse_args()
@@ -141,13 +141,15 @@ def parse_args():
     return args
 
 
-def print_supported_filetypes():
+def print_supported_filetypes() -> None:
     print("========================")
     print("  SUPPORTED FILE TYPES")
     print("========================")
+
     alphabetical = sorted(CRIB_TABLE)
     for i in range(0, len(alphabetical), 5):
         print(*alphabetical[i:i + 5], sep=", ", end=",\n")
+
     return
 
 
@@ -158,7 +160,7 @@ def main():
         return
 
     zip_file = load(args.filename)
-    crack(zip_file, args.output, args.password)
+    crack(zip_file, args.out)
 
 
 if __name__ == "__main__":
