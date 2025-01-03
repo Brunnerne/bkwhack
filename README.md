@@ -17,6 +17,7 @@ $ python3 bkwhack.py <zipfile>
 on the ZIP archive you want to crack with `bkcrack` and let `bkwhack` handle the rest.
 
 *NOTE:* `bkwhack` just calls `bkcrack`, make sure this is already downloaded and on your path.
+It is important to use `bkcrack v1.7.0` or later which added the `-D` option to generate a decrypted archive.
 
 **Full usage:**
 
