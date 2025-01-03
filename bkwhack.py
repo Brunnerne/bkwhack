@@ -6,6 +6,7 @@ import sys
 
 from zipfile import ZipFile
 from fileformats import CRIB_TABLE
+from logger import log
 
 
 def load(filename: str) -> ZipFile:
@@ -24,6 +25,7 @@ def get_crackable(zip_file: ZipFile) -> dict:
     crackable = {}
     zip_entries = run_cmd(f"bkcrack -L {zip_file.filename}").split("\n")
     for entry in zip_entries[2:]:
+        print(entry)
         info = entry.split()
         if info[1] != "ZipCrypto" or info[2] != "Store":
             continue
@@ -41,6 +43,7 @@ def get_crackable(zip_file: ZipFile) -> dict:
         # Index by length of longest crib, then size for easy sorting
         index = (-max(len(c) for c in offset_cribs.values()), size)
         crackable[index] = (filename, offset_cribs)
+    print()
 
     # Sort by fastest crackable
     return dict(sorted(crackable.items())).values()
@@ -80,30 +83,31 @@ def recover_keys(zip_file: ZipFile, filename: str, cribs: dict) -> str | None:
 
 
 def crack(zip_file: ZipFile, output: str) -> bool:
+    print()
+    log.info(f"Analyzing files in {zip_file.filename}...\n")
     crackable = get_crackable(zip_file)
     if len(crackable) == 0:
-        print("[!] No auto-crackable files found :(")
+        log.error("No auto-crackable files found :(")
         return
 
     for filename, cribs in crackable:
-        print(f"[+] Found potentially crackable file '{filename}'")
-        print("[*] Attempting key recovery, this might take a while...\n")
+        log.info(f"Attempting key recovery for potentially crackable file '{filename}':\n")
         keys = recover_keys(zip_file, filename, cribs)
         if keys is None:
-            print(f"[-] Key recovery failed for file '{filename}'\n")
+            log.warning(f"Key recovery failed for file '{filename}'\n")
             continue
 
-        print(f"[+] Keys successfully recovered: {keys}")
+        log.success(f"Keys successfully recovered: {keys}\n")
 
-        print(f"[*] Generating unencrypted output archive '{output}'...")
+        log.info(f"Generating unencrypted output archive '{output}'...")
         cmd = f"bkcrack -C {zip_file.filename} -k {keys} -D {output}"
         print(f"\n{cmd}\n")
         run_cmd(cmd)
-        print(f"[+] Unencrypted archive generated and can now be extracted")
+        log.success("Unencrypted archive successfully generated!")
 
         return True
 
-    print("[!] Auto-cracking unsuccessful :(")
+    log.error("Auto-cracking unsuccessful :(")
 
     return False
 
@@ -118,19 +122,19 @@ def parse_args() -> argparse.Namespace:
         nargs="?",
         metavar="zipfile",
         type=argparse.FileType("rb"),
-        help="Encrypted ZIP file"
+        help="encrypted ZIP file"
     )
 
     parser.add_argument(
         "-l", "--list",
         action="store_true",
-        help="List supported file types"
+        help="list supported file types"
     )
 
     parser.add_argument(
         "-o", "--out",
         default="decrypted.zip",
-        help="Filename for unlocked ZIP file (default: %(default)s)"
+        help="filename for unlocked ZIP file (default: %(default)s)"
     )
     
     args = parser.parse_args()
